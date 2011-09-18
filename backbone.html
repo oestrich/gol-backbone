@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Backbone game of life</title>
+    <meta charset='utf-8' />
+    <script type='text/javascript' src='jquery.js'> </script>
+    <script type='text/javascript' src='underscore.js'> </script>
+    <script type='text/javascript' src='backbone.js'> </script>
+
+    <style type='text/css'>
+      html, body {
+        background-color: #555;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      table {
+        border-spacing: 0px;
+        height: 100%;
+        padding: 0;
+        width: 100%;
+      }
+      td {
+        height: 20px;
+        margin: 0;
+        padding: 0;
+        width: 20px;
+      }
+      .dead {
+        background-color: #000;
+      }
+    </style>
+
+    <script>
+      $(function() {
+        var GridHeight = 40;
+        var GridWidth = 70;
+
+        var Cell = Backbone.Model.extend({
+          initialize: function() {
+            this.set({alive: false, next: false});
+          },
+          cssClass: function() {
+            return this.get("alive") ? "" : "dead"
+          },
+          flip: function() {
+            var alive = this.get("alive") ? false : true;
+            this.set({alive: alive});
+          },
+          alive: function() {
+            return this.get("alive") ? 1 : 0;
+          },
+          neighbors: function() {
+            var neighborMatrix = [[-1, -1], [0, -1], [1, -1],
+                                  [-1, 0],           [1, 0],
+                                  [-1, 1],  [0, 1],  [1, 1]];
+
+
+            self = this;
+            return _.map(neighborMatrix, function(pair) {
+              x = self.get('x') + pair[0];
+              y = self.get('y') + pair[1];
+              return window.cells.at((y * GridWidth) + x);
+            });
+          },
+          neighborCount: function() {
+            neighbors = _.select(this.neighbors(), function(cell) {
+              return cell !== undefined && cell.get('alive');
+            });
+
+            return neighbors.length;
+          },
+          nextState: function() {
+            if(this.get('alive')) {
+              if (this.neighborCount() == 2 || this.neighborCount() == 3) {
+                this.set({next: true});
+              }
+              else {
+                this.set({next: false});
+              }
+            }
+            else {
+              if (this.neighborCount() == 3) {
+                this.set({next: true});
+              }
+            }
+            return this.get("next");
+          },
+          setNextState: function() {
+            this.set({alive: this.get("next")});
+          }
+        });
+
+        var Cells = Backbone.Collection.extend({
+          model: Cell
+        });
+
+        var CellView = Backbone.View.extend({
+          tagName: "td",
+          events: {
+            "click": "flip"
+          },
+          initialize: function() {
+            _.bindAll(this, "render");
+            this.model.bind("change:alive", this.render);
+          },
+          render: function() {
+            $(this.el).removeClass("dead");
+            $(this.el).addClass(this.model.cssClass());
+            return this;
+          },
+          flip: function() {
+            this.model.flip();
+          }
+        });
+
+        window.cells = new Cells();
+
+        for(y = 0; y < GridHeight; y++) {
+          row = $("#board").append($("<tr></tr>")).find("tr:last");
+          for(x = 0; x < GridWidth; x++) {
+            var cell = new Cell({x: x, y: y});
+            cells.add(cell);
+            var view = new CellView({model: cell});
+            row.append(view.render().el);
+          }
+        }
+
+        running = false;
+        logic = function() {
+          ticker = setInterval(function() {
+            cells.each(function(cell) { cell.nextState(); });
+            cells.each(function(cell) { cell.setNextState(); });
+          }, 50);
+          running = true;
+        }
+
+        $(document).bind("keyup", function(e) {
+          if (e.keyCode == 32) {
+            if (running) {
+              clearInterval(ticker);
+              running = false;
+            }
+            else {
+              logic();
+            }
+          }
+        });
+
+        logic();
+      });
+    </script>
+  </head>
+  <body>
+    <table id="board">
+    </table>
+  </body>
+</html>
